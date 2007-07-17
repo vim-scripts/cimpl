@@ -1,0 +1,42 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=1960
+
+This script generates empty implementations for C/C++ functions from specified header file. For following header file
+
+#ifndef TEST_H
+#define TEST_H
+class Test
+{
+    public:
+        explicit Test(int val = 0);
+        int getVal() const
+        {
+            return m_val;
+        }
+        void setVal(int val);
+
+        friend const Test operator +(const Test& a, const Test& b);
+
+    private:
+         int m_val;
+};
+
+const Test operator + ( const Test &a, const Test & b );
+#endif
+
+output will be
+
+Test::Test(int val)
+{
+    
+}
+
+void Test::setVal(int val)
+{
+    
+}
+
+const Test operator +(const Test& a, const Test& b)
+{
+    
+}
+
