@@ -13,30 +13,62 @@
 " This string will insert #include directive and function implementations in
 " source file if header file exists.
 
+function! ToUnifiedSignature(signature)
+    let result = a:signature
+    let result = substitute(result, "\\s*\(\\s*", " ( ", "g")
+    let result = substitute(result, "\\s*\)\\s*", " ) ", "g")
+    let result = substitute(result, "\\s*\&\\s*", " _ ", "g")
+    let result = substitute(result, "\\s*\\*\\s*", " * ", "g")
+    let result = substitute(result, "\\s\\s", " ", "g")
+    return result
+endfunction
+
+function! BracePairsBefore(str, pos)
+    let result = 0
+    for i in [ 0, 1, 2 ]
+        if a:str[i] == "("
+            let pairs = pairs + 1
+        elseif a:str[i] == ")"
+            let pairs = pairs - 1
+        endif
+    endfor
+    return result
+endfunction
+
 function! GenImpl(header)
     let ctags_output = split(system('exuberant-ctags -R --c++-types=+px --excmd=pattern --sort=no -f - "'.a:header.'"'), "\n")
     let result = ""
+    let processed_defs = []
     for i in ctags_output
         let d_type = matchstr(substitute(i, "^.*\$\/;\"", "", ""), "\\a")
         if d_type == "p"
             let def = substitute(substitute(i, "^.*\/\^\\s*", "", ""), "\$\/\;\".*$", "", "")
             let class = substitute(matchstr(i, "class:\\s*.*$"), "class:\\s*", "", "")
 
-            let def = substitute(def, "\".*\"", "", "")
-            let def = substitute(def, "\'.*\'", "", "")
-            let def = substitute(def, "\\\\/\\*.*\\*\\\\/", "", "")
-            let def = substitute(def, "\\\\/\\\\/.*$", "", "")
+            let def = substitute(def, "\".*\"", "", "g")
+            let def = substitute(def, "\'.*\'", "", "g")
+            let def = substitute(def, "\\\\/\\*.*\\*\\\\/", "", "g")
+            let def = substitute(def, "\\\\/\\\\/.*$", "", "g")
 
             let def = substitute(def, "\\s*explicit\\s*", "", "")
             let def = substitute(def, "\\s*virtual\\s*", "", "")
             let def = substitute(def, "\\s*inline\\s*", "", "")
             let def = substitute(def, "\\s*static\\s*", "", "")
             let def = substitute(def, ";\\s*$", "", "")
-
-            let pos = match(def, "\\s*=")
-            while pos != -1
+            if matchstr(def, "friend") == "friend"
+                let def = substitute(def, "\\s*friend\\s*", "", "")
+                let class = ""
+            endif
+            
+            if (matchstr(i, "^[^\t]*") == "operator =")
+                let startpos = match(def, "\\s*=") + strlen(matchstr(def, "\\s*="))
+            else
+            let startpos = 0
+            endif
+            let pos = startpos + match(strpart(def, startpos), "\\s*=")
+            while pos != startpos - 1
                 let brace_count = 0
-                while pos != -1
+                while 1
                     let def = strpart(def, 0, pos).strpart(def, pos + 1)
                     if def[pos] == "("
                         let brace_count = brace_count + 1
@@ -51,11 +83,11 @@ function! GenImpl(header)
                         break
                     endif
                 endwhile
-                let pos = match(def, "\\s*=")
+                let pos = startpos + match(strpart(def, startpos), "\\s*=")
             endwhile
 
             if class != ""
-                let func_name = escape(matchstr(i, "^\\S*"), "~")
+                let func_name = escape(matchstr(i, "^[^\t]*"), "~")
                 let type = substitute(def, "\\s*".func_name.".*$", "", "")
                 if type != ""
                     let def = type." ".class."::".substitute(def, type."\\s*", "", "")
@@ -63,7 +95,10 @@ function! GenImpl(header)
                     let def = class."::".def
                 endif
             endif
-            let result .= "\n".def."\n{\n    \n}\n"
+            if index(processed_defs, ToUnifiedSignature(def)) == -1
+                let result .= "\n".def."\n{\n    \n}\n"
+                let processed_defs = processed_defs + [ToUnifiedSignature(def)]
+            endif
         endif
     endfor
     return result
@@ -73,5 +108,5 @@ function! InsertImpl(header)
     exec "normal i".GenImpl(header)."\<esc>"
 endfunction
 
-"echo GenImpl("/tmp/f/test.h")
+" echo GenImpl("/tmp/f/test.h")
 
