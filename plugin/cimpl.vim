@@ -49,6 +49,12 @@ function! GenImpl(header)
             let def = substitute(def, "\'.*\'", "", "g")
             let def = substitute(def, "\\\\/\\*.*\\*\\\\/", "", "g")
             let def = substitute(def, "\\\\/\\\\/.*$", "", "g")
+            
+			if matchstr(def, "virtual") == "virtual"
+                if match(def, "\\s*=\\s*0\\s*;\\s*$") != -1
+                    continue
+                endif
+			endif
 
             let def = substitute(def, "\\s*explicit\\s*", "", "")
             let def = substitute(def, "\\s*virtual\\s*", "", "")
